@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Password Generator &amp; Analyzer | Cyber Security Mini Project</title>
+<style>
+  :root {
+    --bg:#eef0f3; --panel:#ffffff; --ink:#1b2430; --muted:#5b6675; --line:#cfd5dd;
+    --accent:#7a2e63; --accent-ink:#fff; --bad:#b3372b; --warn:#b97a10; --ok:#2f7d46;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#151a21; --panel:#1e252e; --ink:#e7ebf0; --muted:#9aa6b5; --line:#35404d;
+            --accent:#d58bc0; --accent-ink:#1b1220; --bad:#ef7d70; --warn:#e5b04d; --ok:#74c38a; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); min-height:100vh;
+         font:16px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+         display:flex; justify-content:center; padding:28px 16px; }
+  main { width:100%; max-width:600px; }
+  h1 { font-size:1.55rem; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .tabs { display:flex; gap:6px; margin-bottom:12px; }
+  .tabs button { flex:1; padding:10px; background:transparent; color:var(--ink);
+                 border:1px solid var(--line); border-radius:8px; font:inherit; font-weight:600; cursor:pointer; }
+  .tabs button[aria-selected="true"] { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; }
+  .card[hidden] { display:none; }
+  .box { display:flex; gap:8px; margin-bottom:10px; }
+  .field { flex:1; min-width:0; padding:13px; border:1px solid var(--line); border-radius:8px; background:var(--bg);
+           color:var(--ink); font:1.1rem "Consolas","Courier New",monospace; word-break:break-all; min-height:52px; }
+  input.field { width:100%; }
+  button.act { font:inherit; font-weight:600; padding:0 16px; border-radius:8px; cursor:pointer;
+               border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); }
+  button.ghost { background:transparent; color:var(--accent); }
+  button:focus-visible, input:focus-visible { outline:3px solid var(--warn); outline-offset:2px; }
+  .hash { font:.78rem "Consolas","Courier New",monospace; color:var(--muted); word-break:break-all; margin:0 0 14px; }
+  .meter { height:8px; background:var(--line); border-radius:4px; overflow:hidden; }
+  .bar { height:100%; width:0; background:var(--bad); transition:width .25s, background .25s; }
+  .stats { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin:8px 0 18px; color:var(--muted); font-size:.92rem; }
+  .stats strong { color:var(--ink); }
+  .row { display:flex; justify-content:space-between; margin-bottom:6px; }
+  input[type=range] { width:100%; accent-color:var(--accent); margin-bottom:14px; }
+  .opts { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; margin-bottom:18px; }
+  .opts label { display:flex; gap:8px; align-items:center; cursor:pointer; }
+  input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); }
+  .go { width:100%; padding:12px; }
+  .msg { color:var(--bad); min-height:1.4em; margin:10px 0 0; font-size:.92rem; }
+  ul.checks { list-style:none; padding:0; margin:0 0 6px; }
+  ul.checks li { padding:6px 0; border-bottom:1px solid var(--line); display:flex; gap:10px; }
+  ul.checks .mark { font-weight:700; width:3.4em; }
+  .pass .mark { color:var(--ok); } .fail .mark { color:var(--bad); }
+  details { margin-top:18px; } summary { cursor:pointer; font-weight:600; }
+  details ul { padding-left:20px; color:var(--muted); font-size:.94rem; }
+  footer { text-align:center; margin-top:18px; font-size:.85rem; color:var(--muted); }
+  @media (max-width:440px) { .opts { grid-template-columns:1fr; } .box { flex-direction:column; } .box button { padding:11px; } }
+  @media (prefers-reduced-motion: reduce) { .bar { transition:none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Password Generator &amp; Analyzer</h1>
+  <p class="sub">Generate a strong password or test one you already use. Everything stays in your browser.</p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabGen" aria-selected="true" aria-controls="genPanel">Generate</button>
+    <button role="tab" id="tabAna" aria-selected="false" aria-controls="anaPanel">Analyze</button>
+  </div>
+
+  <!-- GENERATE -->
+  <section class="card" id="genPanel" role="tabpanel">
+    <div class="box">
+      <div class="field" id="pw" aria-live="polite"></div>
+      <button class="act ghost" id="copy" type="button">Copy</button>
+    </div>
+    <p class="hash" id="genHash"></p>
+    <div class="meter" aria-hidden="true"><div class="bar" id="genBar"></div></div>
+    <div class="stats">
+      <span>Strength: <strong id="genLevel">-</strong></span>
+      <span>Entropy: <strong id="genBits">0</strong> bits</span>
+      <span>Time to crack: <strong id="genCrack">-</strong></span>
+    </div>
+    <div class="row"><label for="len">Password length</label><strong id="lenVal">16</strong></div>
+    <input id="len" type="range" min="8" max="64" value="16">
+    <div class="opts">
+      <label><input type="checkbox" id="upper" checked> Uppercase (A-Z)</label>
+      <label><input type="checkbox" id="lower" checked> Lowercase (a-z)</label>
+      <label><input type="checkbox" id="digits" checked> Numbers (0-9)</label>
+      <label><input type="checkbox" id="symbols" checked> Symbols (!@#$...)</label>
+      <label><input type="checkbox" id="ambig"> Exclude look-alikes (I l 1 O 0 o)</label>
+    </div>
+    <button class="act go" id="gen" type="button">Generate password</button>
+    <p class="msg" id="genMsg" role="alert"></p>
+  </section>
+
+  <!-- ANALYZE -->
+  <section class="card" id="anaPanel" role="tabpanel" hidden>
+    <div class="box">
+      <input class="field" id="test" type="password" autocomplete="off" spellcheck="false" placeholder="Type a password to test" aria-label="Password to analyze">
+      <button class="act ghost" id="show" type="button">Show</button>
+    </div>
+    <p class="hash" id="anaHash"></p>
+    <div class="meter" aria-hidden="true"><div class="bar" id="anaBar"></div></div>
+    <div class="stats">
+      <span>Strength: <strong id="anaLevel">-</strong></span>
+      <span>Entropy: <strong id="anaBits">0</strong> bits</span>
+      <span>Time to crack: <strong id="anaCrack">-</strong></span>
+    </div>
+    <ul class="checks" id="checks"></ul>
+  </section>
+
+  <details>
+    <summary>How it works</summary>
+    <ul>
+      <li>Passwords are created with <code>crypto.getRandomValues()</code> (a secure random source) and rejection sampling, so every character is equally likely.</li>
+      <li>Entropy = length &times; log<sub>2</sub>(pool size). Crack time assumes an offline attacker making 10 billion guesses per second.</li>
+      <li>The analyzer checks length, character types, common passwords (including look-alike swaps like p@ssw0rd), keyboard or number sequences, and repeated characters.</li>
+      <li>The SHA-256 hash shows what a system should store instead of the password. Real systems should also add a salt and use a slow algorithm such as bcrypt or Argon2.</li>
+    </ul>
+  </details>
+  <footer>Cyber Security Mini Project</footer>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const SETS = { upper:"ABCDEFGHIJKLMNOPQRSTUVWXYZ", lower:"abcdefghijklmnopqrstuvwxyz",
+                 digits:"0123456789", symbols:"!@#$%^&*()-_=+[]{};:,.?/~" };
+  const COMMON = ["password","123456","12345678","123456789","qwerty","abc123","password1","111111","iloveyou",
+    "admin","welcome","letmein","monkey","dragon","football","login","qwerty123","000000","1q2w3e4r","sunshine",
+    "master","princess","shadow","superman","trustno1","hello","freedom","whatever","admin123","root","test","guest","india123"];
+  const SEQS = ["abcdefghijklmnopqrstuvwxyz","0123456789","qwertyuiop","asdfghjkl","zxcvbnm"];
+
+  // ---------- helpers ----------
+  function randInt(max) {                       // secure, no modulo bias
+    const limit = Math.floor(4294967296 / max) * max, buf = new Uint32Array(1);
+    do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+    return buf[0] % max;
+  }
+  function shuffle(a) {                         // Fisher-Yates
+    for (let i = a.length - 1; i > 0; i--) { const j = randInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  async function sha256(text) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+  async function showHash(el, text) {
+    if (!text) { el.textContent = ""; return; }
+    try { el.textContent = "SHA-256: " + await sha256(text); }
+    catch (e) { el.textContent = "SHA-256 needs a secure page (https or localhost)."; }
+  }
+  function formatTime(s) {
+    if (s < 1) return "instantly";
+    if (s >= 31557600 * 1e9) return "billions of years+";
+    for (const [n, v] of [["year",31557600],["day",86400],["hour",3600],["minute",60],["second",1]])
+      if (s >= v) { const k = Math.floor(s / v); return k.toLocaleString() + " " + n + (k > 1 ? "s" : ""); }
+  }
+  function paint(prefix, bits) {
+    let level = "Weak", color = "var(--bad)";
+    if (bits >= 100) { level = "Excellent"; color = "var(--ok)"; }
+    else if (bits >= 75) { level = "Strong"; color = "var(--ok)"; }
+    else if (bits >= 50) { level = "Fair"; color = "var(--warn)"; }
+    $(prefix + "Level").textContent = level;
+    $(prefix + "Bits").textContent = bits.toFixed(1);
+    $(prefix + "Crack").textContent = formatTime(Math.pow(2, bits) / 2 / 1e10);
+    $(prefix + "Bar").style.width = Math.min(100, bits / 1.28) + "%";
+    $(prefix + "Bar").style.background = color;
+  }
+  function poolSize(pw) {
+    let n = 0;
+    if (/[a-z]/.test(pw)) n += 26; if (/[A-Z]/.test(pw)) n += 26;
+    if (/[0-9]/.test(pw)) n += 10; if (/[^A-Za-z0-9]/.test(pw)) n += 25;
+    return n;
+  }
+
+  // ---------- generator ----------
+  function activeSets() {
+    const strip = $("ambig").checked;
+    return Object.keys(SETS).filter(k => $(k).checked).map(k => strip ? SETS[k].replace(/[Il1O0o]/g, "") : SETS[k]);
+  }
+  function generate() {
+    const sets = activeSets(), len = +$("len").value;
+    if (!sets.length) { $("genMsg").textContent = "Select at least one character type."; return; }
+    $("genMsg").textContent = "";
+    const pool = sets.join("");
+    const chars = sets.map(s => s[randInt(s.length)]);
+    while (chars.length < len) chars.push(pool[randInt(pool.length)]);
+    const pw = shuffle(chars).join("");
+    $("pw").textContent = pw;
+    paint("gen", len * Math.log2(pool.length));
+    showHash($("genHash"), pw);
+  }
+  async function copy() {
+    const t = $("pw").textContent;
+    try { await navigator.clipboard.writeText(t); }
+    catch (e) { const a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); }
+    $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy", 1500);
+  }
+
+  // ---------- analyzer ----------
+  function unLeet(s) {
+    return s.toLowerCase().replace(/[@4]/g,"a").replace(/[3]/g,"e").replace(/[1!|]/g,"i").replace(/0/g,"o").replace(/[$5]/g,"s");
+  }
+  function isCommon(pw) {
+    const a = pw.toLowerCase(), b = unLeet(pw), bare = b.replace(/[^a-z0-9]/g, "");
+    return COMMON.some(w => a === w || b === unLeet(w) || (w.length >= 5 && bare.includes(unLeet(w)) && pw.length <= w.length + 4));
+  }
+  function hasSequence(pw) {
+    const s = pw.toLowerCase();
+    for (const q of SEQS) for (const seq of [q, [...q].reverse().join("")])
+      for (let i = 0; i + 3 <= seq.length; i++) if (s.includes(seq.slice(i, i + 3))) return true;
+    return false;
+  }
+  function analyze() {
+    const pw = $("test").value, ul = $("checks");
+    ul.textContent = "";
+    if (!pw) { paint("ana", 0); $("anaLevel").textContent = "-"; $("anaCrack").textContent = "-"; showHash($("anaHash"), ""); return; }
+    const common = isCommon(pw), seq = hasSequence(pw), rep = /(.)\1{2,}/.test(pw);
+    const rules = [
+      ["At least 12 characters", pw.length >= 12],
+      ["Has uppercase letters", /[A-Z]/.test(pw)],
+      ["Has lowercase letters", /[a-z]/.test(pw)],
+      ["Has numbers", /[0-9]/.test(pw)],
+      ["Has symbols", /[^A-Za-z0-9]/.test(pw)],
+      ["Not a common password", !common],
+      ["No sequences (abc, 123, qwerty)", !seq],
+      ["No repeated characters (aaa)", !rep]
+    ];
+    for (const [text, ok] of rules) {
+      const li = document.createElement("li"); li.className = ok ? "pass" : "fail";
+      const m = document.createElement("span"); m.className = "mark"; m.textContent = ok ? "Pass" : "Fail";
+      const t = document.createElement("span"); t.textContent = text;
+      li.append(m, t); ul.appendChild(li);
+    }
+    let bits = pw.length * Math.log2(poolSize(pw) || 1);
+    if (seq) bits *= 0.7;
+    if (rep) bits *= 0.8;
+    if (common) bits = Math.min(bits, 12);
+    paint("ana", bits);
+    showHash($("anaHash"), pw);
+  }
+
+  // ---------- tabs and events ----------
+  function tab(which) {
+    const gen = which === "gen";
+    $("genPanel").hidden = !gen; $("anaPanel").hidden = gen;
+    $("tabGen").setAttribute("aria-selected", gen); $("tabAna").setAttribute("aria-selected", !gen);
+  }
+  $("tabGen").onclick = () => tab("gen");
+  $("tabAna").onclick = () => tab("ana");
+  $("gen").onclick = generate;
+  $("copy").onclick = copy;
+  $("len").oninput = () => { $("lenVal").textContent = $("len").value; generate(); };
+  ["upper","lower","digits","symbols","ambig"].forEach(id => $(id).onchange = generate);
+  $("test").oninput = analyze;
+  $("show").onclick = () => {
+    const hidden = $("test").type === "password";
+    $("test").type = hidden ? "text" : "password"; $("show").textContent = hidden ? "Hide" : "Show";
+  };
+  generate();
+</script>
+</body>
+</html>

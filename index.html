@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Password Generator | CS&amp;F Mini Project</title>
+<style>
+  :root {
+    --bg: #e8ecea; --panel: #fbfcfb; --ink: #16211f; --muted: #55635f;
+    --line: #c5cec9; --accent: #1f6f5c; --accent-ink: #ffffff;
+    --weak: #b4432f; --fair: #c98a1b; --strong: #4c8a3a; --best: #1f6f5c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141c1a; --panel: #1c2725; --ink: #e6eeea; --muted: #9bada6;
+      --line: #33443f; --accent: #5cc4a6; --accent-ink: #0f1a17;
+      --weak: #e0705a; --fair: #e0a93c; --strong: #86c46f; --best: #5cc4a6;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    min-height: 100vh; display: flex; justify-content: center; padding: 32px 16px;
+  }
+  main { width: 100%; max-width: 560px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { margin: 0 0 24px; color: var(--muted); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 20px;
+  }
+  .output {
+    display: flex; gap: 8px; align-items: stretch; margin-bottom: 16px;
+  }
+  #pw {
+    flex: 1; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 8px;
+    font: 1.15rem/1.4 "Consolas", "Courier New", monospace; background: var(--bg);
+    color: var(--ink); word-break: break-all; min-height: 56px; display: flex; align-items: center;
+  }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px;
+    padding: 0 16px; border: 1px solid var(--accent);
+    background: var(--accent); color: var(--accent-ink);
+  }
+  button.ghost { background: transparent; color: var(--accent); }
+  button:hover { filter: brightness(1.08); }
+  :focus-visible { outline: 3px solid var(--fair); outline-offset: 2px; }
+  .meter { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  #bar { height: 100%; width: 0; background: var(--weak); transition: width .25s, background .25s; }
+  .stats { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+           margin: 8px 0 20px; font-size: .92rem; color: var(--muted); }
+  .stats strong { color: var(--ink); }
+  .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin-bottom: 16px; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 20px; }
+  label.opt { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .actions { display: flex; gap: 8px; }
+  .actions button { flex: 1; padding: 12px; }
+  #msg { min-height: 1.4em; margin: 12px 0 0; font-size: .92rem; color: var(--weak); }
+  details { margin-top: 20px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details ul { padding-left: 20px; color: var(--muted); font-size: .95rem; }
+  footer { margin-top: 20px; font-size: .85rem; color: var(--muted); text-align: center; }
+  @media (max-width: 420px) { .opts { grid-template-columns: 1fr; } .output { flex-direction: column; } .output button { padding: 12px; } }
+  @media (prefers-reduced-motion: reduce) { #bar { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Password Generator</h1>
+  <p class="sub">Create a strong random password. Everything runs in your browser; nothing is sent or stored.</p>
+
+  <section class="card" aria-label="Password generator">
+    <div class="output">
+      <div id="pw" aria-live="polite">Click Generate</div>
+      <button id="copy" class="ghost" type="button">Copy</button>
+    </div>
+
+    <div class="meter" aria-hidden="true"><div id="bar"></div></div>
+    <div class="stats">
+      <span>Strength: <strong id="level">-</strong></span>
+      <span>Entropy: <strong id="bits">0</strong> bits</span>
+      <span>Time to crack: <strong id="crack">-</strong></span>
+    </div>
+
+    <div class="row">
+      <label for="len">Password length</label>
+      <strong id="lenVal">16</strong>
+    </div>
+    <input id="len" type="range" min="8" max="64" value="16">
+
+    <div class="opts">
+      <label class="opt"><input type="checkbox" id="upper" checked> Uppercase (A-Z)</label>
+      <label class="opt"><input type="checkbox" id="lower" checked> Lowercase (a-z)</label>
+      <label class="opt"><input type="checkbox" id="digits" checked> Numbers (0-9)</label>
+      <label class="opt"><input type="checkbox" id="symbols" checked> Symbols (!@#$...)</label>
+      <label class="opt"><input type="checkbox" id="ambig"> Exclude look-alikes (I l 1 O 0 o)</label>
+    </div>
+
+    <div class="actions">
+      <button id="gen" type="button">Generate password</button>
+    </div>
+    <p id="msg" role="alert"></p>
+
+    <details>
+      <summary>How it works</summary>
+      <ul>
+        <li>Random numbers come from <code>crypto.getRandomValues()</code>, a cryptographically secure generator. <code>Math.random()</code> is predictable and is not used.</li>
+        <li>Rejection sampling removes modulo bias, so every character is equally likely.</li>
+        <li>At least one character from each selected type is guaranteed, then the result is shuffled (Fisher-Yates).</li>
+        <li>Entropy = length &times; log<sub>2</sub>(character pool size). Crack time assumes an offline attacker making 10 billion guesses per second.</li>
+      </ul>
+    </details>
+  </section>
+  <footer>CS&amp;F Mini Project</footer>
+</main>
+
+<script>
+  const SETS = {
+    upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    lower: "abcdefghijklmnopqrstuvwxyz",
+    digits: "0123456789",
+    symbols: "!@#$%^&*()-_=+[]{};:,.?/~"
+  };
+  const AMBIGUOUS = /[Il1O0o]/g;
+  const $ = id => document.getElementById(id);
+
+  // Secure random integer in [0, max) using rejection sampling (no modulo bias)
+  function randInt(max) {
+    const limit = Math.floor(4294967296 / max) * max;
+    const buf = new Uint32Array(1);
+    do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+    return buf[0] % max;
+  }
+
+  // Fisher-Yates shuffle using the secure generator
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = randInt(i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function activeSets() {
+    const noAmbig = $("ambig").checked;
+    return Object.keys(SETS)
+      .filter(k => $(k).checked)
+      .map(k => noAmbig ? SETS[k].replace(AMBIGUOUS, "") : SETS[k]);
+  }
+
+  function generate() {
+    const sets = activeSets();
+    const len = +$("len").value;
+    if (sets.length === 0) {
+      $("msg").textContent = "Select at least one character type.";
+      return;
+    }
+    $("msg").textContent = "";
+    const pool = sets.join("");
+    const chars = sets.map(s => s[randInt(s.length)]);   // one from each type
+    while (chars.length < len) chars.push(pool[randInt(pool.length)]);
+    $("pw").textContent = shuffle(chars).join("");
+    showStrength(len, pool.length);
+  }
+
+  function formatTime(seconds) {
+    if (seconds < 1) return "instantly";
+    const units = [["year", 31557600], ["day", 86400], ["hour", 3600], ["minute", 60], ["second", 1]];
+    if (seconds >= 31557600 * 1e9) return "billions of years+";
+    for (const [name, s] of units) {
+      if (seconds >= s) {
+        const n = Math.floor(seconds / s);
+        return n.toLocaleString() + " " + name + (n > 1 ? "s" : "");
+      }
+    }
+  }
+
+  function showStrength(len, poolSize) {
+    const bits = len * Math.log2(poolSize);
+    const seconds = Math.pow(2, bits) / 2 / 1e10;      // average case
+    let level = "Weak", color = "var(--weak)";
+    if (bits >= 100) { level = "Excellent"; color = "var(--best)"; }
+    else if (bits >= 75) { level = "Strong"; color = "var(--strong)"; }
+    else if (bits >= 50) { level = "Fair"; color = "var(--fair)"; }
+    $("level").textContent = level;
+    $("bits").textContent = bits.toFixed(1);
+    $("crack").textContent = formatTime(seconds);
+    $("bar").style.width = Math.min(100, bits / 1.28) + "%";
+    $("bar").style.background = color;
+  }
+
+  async function copy() {
+    const text = $("pw").textContent;
+    if (!/\S/.test(text) || text === "Click Generate") return;
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) {
+      const t = document.createElement("textarea");
+      t.value = text; document.body.appendChild(t); t.select();
+      document.execCommand("copy"); t.remove();
+    }
+    $("copy").textContent = "Copied";
+    setTimeout(() => $("copy").textContent = "Copy", 1500);
+  }
+
+  $("len").addEventListener("input", () => { $("lenVal").textContent = $("len").value; generate(); });
+  ["upper", "lower", "digits", "symbols", "ambig"].forEach(id => $(id).addEventListener("change", generate));
+  $("gen").addEventListener("click", generate);
+  $("copy").addEventListener("click", copy);
+  generate();
+</script>
+</body>
+</html>
